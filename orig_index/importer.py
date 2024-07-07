@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import requests
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from .db import (
@@ -114,31 +115,30 @@ def import_one_local_file(fp: Path, session) -> File:
                 print("  [WS ONLY]")
                 return
             print(segments)
-            stmt = (
-                insert(Snippet)
-                .values(
-                    [
-                        {
-                            "hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                            "text": text,
-                        }
-                        for a, b, text in segments
-                    ]
-                )
-                .on_conflict_do_nothing()
-                .returning(Snippet)
-            )
-            result = session.execute(stmt)
-            result_all = result.all()
+            values = [
+                {
+                    "hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "text": text,
+                }
+                for a, b, text in segments
+            ]
+            stmt = insert(Snippet).values(values).on_conflict_do_nothing()
+            session.execute(stmt)
+
+            hashes = [v["hash"] for v in values]
+            result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
+            result_all = [r[0] for r in result.all()]
+
             print("RES", result_all)
             new_snippet_in_normalized = [
                 SnippetInNormalizedFile(
                     normalized_file_hash=nh,
                     snippet_hash=r.hash,
                 )
-                for r in result_all[0]
+                for r in result_all
             ]
-            session.add(*new_snippet_in_normalized)
+            for s in new_snippet_in_normalized:
+                session.add(s)
 
             orm_normalized = NormalizedFile(hash=nh, snippets=new_snippet_in_normalized)
             session.add(orm_normalized)
