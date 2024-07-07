@@ -47,7 +47,7 @@ def import_url(hash, url, date) -> None:
                     f.write(chunk)
                     hasher.update(chunk)
 
-        return import_file(hasher.hexdigest(), url, date, Path(td, local_filename))
+        return import_archive(hasher.hexdigest(), url, date, Path(td, local_filename))
 
 
 def import_archive(
@@ -87,7 +87,7 @@ def import_local_dir(archive_hash, archive_url, archive_date, local_dir, session
             # TODO consider pyi?
             if f.endswith(".py"):
                 fp = Path(dirpath, f)
-                orm_file = import_one_local_file(fp)
+                orm_file = import_one_local_file(fp, session)
                 if orm_file:
                     orm_file_in_archive = FileInArchive(archive=archive, file=orm_file)
                     session.add(orm_file_in_archive)
