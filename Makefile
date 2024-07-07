@@ -1,9 +1,10 @@
+UV?=uv
 PYTHON?=python
 SOURCES=orig_index setup.py
 
 .PHONY: venv
 venv:
-	$(PYTHON) -m venv .venv
+	$(UV) venv .venv
 	source .venv/bin/activate && make setup
 	@echo 'run `source .venv/bin/activate` to use virtualenv'
 
@@ -12,7 +13,7 @@ venv:
 
 .PHONY: setup
 setup:
-	python -m pip install -Ue .[dev,test]
+	$(UV) pip install -Ue .[dev,test]
 
 .PHONY: test
 test:

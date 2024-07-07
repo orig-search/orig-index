@@ -1,5 +1,17 @@
 # orig-index
 
+# Database
+
+```
+docker volume create pgdata
+docker run -P --name pgvector -e POSTGRES_PASSWORD=... -v pgdata:/var/lib/postgresql/data -d ankane/pgvector
+# default mapping is 0.0.0.0:32768
+
+cat local_conf.py
+CONNECTION_STRING = "postgresql+psycopg://postgres:...@localhost:32768/postgres"
+
+export PYTHONPATH=$PWD to find local_conf.py too in addition to make setup
+```
 
 # Version Compat
 
