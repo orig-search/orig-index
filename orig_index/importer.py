@@ -143,7 +143,6 @@ def import_one_local_file(fp: Path, session) -> File:
             orm_normalized = NormalizedFile(hash=nh, snippets=new_snippet_in_normalized)
             session.add(orm_normalized)
 
-        # TODO needs some other arg to make normalized->normalized_hash magic happen
         orm_file = File(hash=h, normalized=orm_normalized)
         session.add(orm_file)
     return orm_file

@@ -78,7 +78,7 @@ def import_local_archive(local_file: str) -> None:
 @click.argument("local_file")
 def import_local_file(local_file: str) -> None:
     with Session() as session:
-        print(import_one_local_file(Path(local_file), session).normalized_hash)
+        print(import_one_local_file(Path(local_file), session).normalized.hash)
         session.commit()
 
 
