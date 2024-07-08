@@ -3,7 +3,8 @@ import hashlib
 from pathlib import Path
 
 import click
-from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
+from packaging.version import Version
+from pypi_simple import ACCEPT_JSON_ONLY, DistributionPackage, PyPISimple
 
 from .db import Base, engine, Session
 
@@ -23,20 +24,46 @@ def createdb(clear: bool) -> None:
     Base.metadata.create_all(engine)
 
 
+def rank(dp: DistributionPackage) -> int:
+    if dp.package_type == "sdist":
+        return 10
+    elif "-py3-none-any" in dp.filename:
+        return 5
+    elif "-py2.py3-none-any" in dp.filename:
+        return 4
+    elif "abi3" in dp.filename:
+        return 2
+    elif "cp312" in dp.filename:
+        return 1
+    elif dp.package_type != "wheel":
+        return -1
+    return 0
+
+
 @main.command()
 @click.argument("project")
 def import_project(project: str) -> None:
     # TODO this could use cachecontrol session
     ps = PyPISimple(accept=ACCEPT_JSON_ONLY)
     pp = ps.get_project_page(project)
-    for distribution_package in pp.packages:
+    versions = sorted(
+        {dp.version for dp in pp.packages},
+        key=Version,
+        reverse=True,
+    )
+    for version in versions:
+        distribution_package = max(
+            [dp for dp in pp.packages if dp.version == version],
+            key=rank,
+        )
+
         # .filename
         # .digests["sha256"]
         # .url
         # .size (only if json-fetched)
         # .upload_time (only if json-fetched)
         # .package_type == "wheel" for now
-        if distribution_package.package_type != "wheel":
+        if distribution_package.package_type not in ("sdist", "wheel"):
             continue
 
         import_url(

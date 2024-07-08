@@ -61,7 +61,8 @@ def import_archive(
 
     # TODO ignore cleanup errors
     with tempfile.TemporaryDirectory() as td:
-        shutil.unpack_archive(local_file, td, format="zip")
+        format = "zip" if local_file.suffix in (".zip", ".whl") else "tar"
+        shutil.unpack_archive(local_file, td, format=format)
 
         # TODO handle retries here until it succeeds!
         with Session() as session:
@@ -98,23 +99,24 @@ def import_one_local_file(fp: Path, session) -> File:
     data = fp.read_bytes()
     h = hashlib.sha256(data).hexdigest()
     orm_file = session.get(File, h)
-    if orm_file is None:
+    if orm_file is not None:
+        print("  [HIT ]", fp)
+    else:
         # Step 1: normalize
         mod = normalize(ast.parse(data))
         normalized_bytes = ast.unparse(mod).encode("utf-8")
         nh = hashlib.sha256(normalized_bytes).hexdigest()
         orm_normalized = session.get(NormalizedFile, nh)
         if orm_normalized is not None:
-            print("  [NOM]")
+            print("  [HIT2]", fp)
         else:
-            print("  [SEG]", fp)
             # Step 2: normalized missing too, upsert/collect snippet objects
             segments = list(segment(mod))
             if not segments:
                 # An empty or whitespace-only file has no segments, don't bother indexing.
-                print("  [WS ONLY]")
+                print("  [    ]", fp)
                 return
-            print(segments)
+            print("  [----]", fp)
             values = [
                 {
                     "hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
@@ -129,7 +131,6 @@ def import_one_local_file(fp: Path, session) -> File:
             result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
             result_all = [r[0] for r in result.all()]
 
-            print("RES", result_all)
             new_snippet_in_normalized = [
                 SnippetInNormalizedFile(
                     normalized_file_hash=nh,
