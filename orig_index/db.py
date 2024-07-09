@@ -63,6 +63,7 @@ class NormalizedFile(Base):
 
     hash = Column(String(64), primary_key=True)
     snippets = relationship("SnippetInNormalizedFile", back_populates="normalized_file")
+
     denorm_files = relationship("File", back_populates="normalized")
 
 
@@ -97,7 +98,7 @@ class Snippet(Base):
 
     text = Column(Text)
     # This should probably be denormalized further, with the model or other params as another field.
-    embedding = Vector(512)
+    embedding = Column(Vector(384))
     normalized_files = relationship("SnippetInNormalizedFile", back_populates="snippet")
 
 

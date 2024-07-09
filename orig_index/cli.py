@@ -5,8 +5,9 @@ from pathlib import Path
 import click
 from packaging.version import Version
 from pypi_simple import ACCEPT_JSON_ONLY, DistributionPackage, PyPISimple
+from sqlalchemy import text
 
-from .db import Base, engine, Session
+from .db import Base, engine, NormalizedFile, Session, Snippet
 
 from .importer import have_hash, import_archive, import_one_local_file, import_url
 
@@ -21,6 +22,9 @@ def main():
 def createdb(clear: bool) -> None:
     if clear:
         Base.metadata.drop_all(engine)
+    with Session() as session:
+        session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        session.commit()
     Base.metadata.create_all(engine)
 
 
@@ -107,6 +111,27 @@ def import_local_file(local_file: str) -> None:
     with Session() as session:
         print(import_one_local_file(Path(local_file), session).normalized.hash)
         session.commit()
+
+
+@main.command()
+@click.argument("hash")
+def analyze(hash: str) -> None:
+    with Session() as session:
+        normalized_file = session.get(NormalizedFile, hash)
+        if normalized_file is None:
+            print("Not yet available")
+            return
+        for s in normalized_file.snippets:
+            print(s.snippet.hash)
+
+
+@main.command()
+@click.argument("hash")
+def find_snippet_source(hash: str) -> None:
+    with Session() as session:
+        snippet = session.get(Snippet, hash)
+        for f in snippet.normalized_files:
+            print(f.normalized_file_hash, f.denorm_files)
 
 
 if __name__ == "__main__":

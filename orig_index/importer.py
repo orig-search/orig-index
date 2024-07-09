@@ -21,6 +21,17 @@ from .db import (
 from .norm import normalize
 from .split import segment
 
+MODEL = None
+
+
+def get_model():
+    global MODEL
+    if MODEL is None:
+        from sentence_transformers import SentenceTransformer
+
+        MODEL = SentenceTransformer(os.getenv("MODEL_NAME", "all-MiniLM-L6-v2"))
+    return MODEL
+
 
 def have_hash(sha256: str) -> bool:
     """
@@ -124,8 +135,16 @@ def import_one_local_file(fp: Path, session) -> File:
                 }
                 for a, b, text in segments
             ]
-            stmt = insert(Snippet).values(values).on_conflict_do_nothing()
-            session.execute(stmt)
+            stmt = (
+                insert(Snippet)
+                .values(values)
+                .on_conflict_do_nothing()
+                .returning(Snippet)
+            )
+            ret = session.execute(stmt)
+            model = get_model()
+            for (x,) in ret:
+                x.embedding = model.encode(x.text)
 
             hashes = [v["hash"] for v in values]
             result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
