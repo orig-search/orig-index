@@ -23,6 +23,8 @@ from .split import segment
 
 MODEL = None
 
+VENDOR_DIR_NAMES = {"vendor", "_vendor", "vendored", "_vendored"}
+
 
 def get_model():
     global MODEL
@@ -46,7 +48,7 @@ def have_hash(sha256: str) -> bool:
         return bool(t)
 
 
-def import_url(hash, url, date) -> None:
+def import_url(hash, url, date, project, version) -> None:
     if hash is not None and have_hash(hash):
         return
 
@@ -59,11 +61,13 @@ def import_url(hash, url, date) -> None:
                     f.write(chunk)
                     hasher.update(chunk)
 
-        return import_archive(hasher.hexdigest(), url, date, Path(td, local_filename))
+        return import_archive(
+            hasher.hexdigest(), url, date, Path(td, local_filename), project, version
+        )
 
 
 def import_archive(
-    hash, url, date, local_file
+    hash, url, date, local_file, project, version
 ) -> None:  # TODO maybe return a stats object?
     print(f"[FILE] {hash} from {url}")
     if have_hash(hash):
@@ -83,14 +87,30 @@ def import_archive(
                 archive_date=date,
                 local_dir=td,
                 session=session,
+                project=project,
+                version=version,
             )
             session.commit()
 
 
-def import_local_dir(archive_hash, archive_url, archive_date, local_dir, session):
+def import_local_dir(
+    archive_hash: str,
+    archive_url: str,
+    archive_date,
+    local_dir,
+    session,
+    project: str,
+    version: str,
+):
     archive = session.get(Archive, archive_hash)
     if archive is None:
-        archive = Archive(hash=archive_hash, url=archive_url, timestamp=archive_date)
+        archive = Archive(
+            hash=archive_hash,
+            url=archive_url,
+            timestamp=archive_date,
+            canonical_name=project,
+            version=version,
+        )
         print("  -> create")
         session.add(archive)
 
@@ -100,18 +120,27 @@ def import_local_dir(archive_hash, archive_url, archive_date, local_dir, session
             # TODO consider pyi?
             if f.endswith(".py"):
                 fp = Path(dirpath, f)
-                orm_file = import_one_local_file(fp, session)
+                relative_name = fp.relative_to(local_dir)
+                orm_file = import_one_local_file(fp, fp.relative_to(local_dir), session)
+                vendor_level = sum(
+                    1 for part in relative_name.parts if part in VENDOR_DIR_NAMES
+                )
                 if orm_file:
-                    orm_file_in_archive = FileInArchive(archive=archive, file=orm_file)
+                    orm_file_in_archive = FileInArchive(
+                        archive=archive,
+                        file=orm_file,
+                        sample_name=relative_name.as_posix(),
+                        vendor_level=vendor_level,
+                    )
                     session.add(orm_file_in_archive)
 
 
-def import_one_local_file(fp: Path, session) -> File:
+def import_one_local_file(fp: Path, rel: Path, session) -> File:
     data = fp.read_bytes()
     h = hashlib.sha256(data).hexdigest()
     orm_file = session.get(File, h)
     if orm_file is not None:
-        print("  [HIT ]", fp)
+        print("  [HIT ]", rel)
     else:
         # Step 1: normalize
         mod = normalize(ast.parse(data))
@@ -119,15 +148,15 @@ def import_one_local_file(fp: Path, session) -> File:
         nh = hashlib.sha256(normalized_bytes).hexdigest()
         orm_normalized = session.get(NormalizedFile, nh)
         if orm_normalized is not None:
-            print("  [HIT2]", fp)
+            print("  [HIT2]", rel)
         else:
             # Step 2: normalized missing too, upsert/collect snippet objects
             segments = list(segment(mod))
             if not segments:
                 # An empty or whitespace-only file has no segments, don't bother indexing.
-                print("  [    ]", fp)
+                print("  [    ]", rel)
                 return
-            print("  [----]", fp)
+            print("  [----]", rel)
             values = [
                 {
                     "hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),

@@ -1,6 +1,8 @@
 import datetime
 import hashlib
 from pathlib import Path
+from packaging.utils import canonicalize_name
+from typing import Set
 
 import click
 from packaging.version import Version
@@ -10,6 +12,10 @@ from sqlalchemy import text
 from .db import Base, engine, NormalizedFile, Session, Snippet
 
 from .importer import have_hash, import_archive, import_one_local_file, import_url
+from .similarity import (
+    find_archives_containing_file,
+    find_archives_containing_normalized_file,
+)
 
 
 @click.group()
@@ -44,12 +50,31 @@ def rank(dp: DistributionPackage) -> int:
     return 0
 
 
+def _unpack_range(s: str) -> Set[int]:
+    rv: Set[int] = set()
+    for x in s.split(","):
+        if "-" in x:
+            a, b = map(int, x.split("-", 1))
+            rv.update(range(a, b + 1))
+        else:
+            rv.add(int(x))
+    return rv
+
+
 @main.command()
+@click.option("--shard", default="0-99")
+@click.option("--of-shards", default="100")
 @click.argument("project")
-def import_project(project: str) -> None:
+def import_project(project: str, shard: str, of_shards: str) -> None:
+    shards = _unpack_range(shard)
+    total_shards = int(of_shards)
+    if total_shards != len(shards):
+        print("Importing %.1f%% of project" % (len(shards) * 100.0 / total_shards,))
+
     # TODO this could use cachecontrol session
     ps = PyPISimple(accept=ACCEPT_JSON_ONLY)
-    pp = ps.get_project_page(project)
+    cn = canonicalize_name(project)
+    pp = ps.get_project_page(cn)
     versions = sorted(
         {dp.version for dp in pp.packages},
         key=Version,
@@ -70,10 +95,19 @@ def import_project(project: str) -> None:
         if distribution_package.package_type not in ("sdist", "wheel"):
             continue
 
+        if (
+            int.from_bytes(hashlib.sha256(distribution_package.url.encode()).digest())
+            % total_shards
+        ) not in shards:
+            print("omit", distribution_package.url)
+            continue
+
         import_url(
             hash=distribution_package.digests["sha256"],
             url=distribution_package.url,
             date=distribution_package.upload_time,
+            project=cn,
+            version=distribution_package.version,
         )
 
 
@@ -109,13 +143,46 @@ def import_local_archive(local_file: str) -> None:
 @click.argument("local_file")
 def import_local_file(local_file: str) -> None:
     with Session() as session:
-        print(import_one_local_file(Path(local_file), session).normalized.hash)
+        print(
+            import_one_local_file(
+                Path(local_file), Path(local_file), session
+            ).normalized.hash
+        )
         session.commit()
 
 
-@main.command()
+@main.group()
+def lookup():
+    pass
+
+
+@lookup.command()
+@click.argument("local_file")
+def local_file(local_file: str) -> None:
+    with Session() as session:
+        imported = import_one_local_file(Path(local_file), Path(local_file), session)
+        session.commit()
+
+        print("hash:", imported.hash)
+        print("normalized:", imported.normalized.hash)
+
+        found = False
+        for (m,) in find_archives_containing_file(imported.hash, session).all():
+            print(m.sample_name, "in", m.archive.filename, m.vendor_level)
+            found = True
+
+        if not found:
+            print("No exact matches, checking near matches...")
+            for (m,) in find_archives_containing_normalized_file(
+                imported.normalized.hash, session
+            ).all():
+                print(m.sample_name, "in", m.archive.filename, m.vendor_level)
+            # find_
+
+
+@lookup.command()
 @click.argument("hash")
-def analyze(hash: str) -> None:
+def normalized_hash(hash: str) -> None:
     with Session() as session:
         normalized_file = session.get(NormalizedFile, hash)
         if normalized_file is None:
@@ -125,9 +192,9 @@ def analyze(hash: str) -> None:
             print(s.snippet.hash)
 
 
-@main.command()
+@lookup.command()
 @click.argument("hash")
-def find_snippet_source(hash: str) -> None:
+def snippet_hash(hash: str) -> None:
     with Session() as session:
         snippet = session.get(Snippet, hash)
         for f in snippet.normalized_files:

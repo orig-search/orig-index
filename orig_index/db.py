@@ -23,6 +23,20 @@ class Archive(Base):
     timestamp = Column(DateTime, nullable=False)
     files = relationship("FileInArchive", back_populates="archive")
 
+    # Both of these should be pre-normalized
+    canonical_name = Column(String(256), index=True)
+    version = Column(String(256))
+
+    @property
+    def filename(self):
+        return self.url.split("/")[-1]
+
+    def __repr__(self):
+        if self.canonical_name:
+            return f"Archive({self.filename}, canonical_name={self.canonical_name})"
+        else:
+            return f"Archive({self.filename})"
+
 
 class File(Base):
     __tablename__ = "file"
@@ -33,7 +47,7 @@ class File(Base):
     )
     normalized = relationship("NormalizedFile", back_populates="denorm_files")
     # TODO oldest/canonical archive
-    # archives = relationship("FileInArchive", back_populates="archive_hash")
+    archives = relationship("FileInArchive", back_populates="file")
 
 
 class FileInArchive(Base):
@@ -50,8 +64,12 @@ class FileInArchive(Base):
     file = relationship("File")
     # A given hash can exist more than once in an archive -- this just records an arbitrary one.
     sample_name = Column(String(256))
+    vendor_level = Column(Integer)
     # TODO perms, owner, etc
     # normalized_file = relationship("FileInArchive", back_populates="files")
+
+    def __repr__(self):
+        return f"FileInArchive(archive_hash={self.archive_hash!r}, file_hash={self.file_hash!r})"
 
 
 class NormalizedFile(Base):

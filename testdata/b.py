@@ -1,5 +1,6 @@
 def f(x):
-	pass
+    pass
+
 
 def g(x):
-	pass
+    pass

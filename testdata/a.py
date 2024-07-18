@@ -1,2 +1,2 @@
 def f(x):
-	pass
+    pass
