@@ -80,8 +80,8 @@ def _unpack_range(s: str) -> Set[int]:
 @main.command()
 @click.option("--shard", default="0-99")
 @click.option("--of-shards", default="100")
-@click.argument("project")
-def import_project(project: str, shard: str, of_shards: str) -> None:
+@click.argument("projects", nargs=-1)
+def import_project(projects: list[str], shard: str, of_shards: str) -> None:
     shards = _unpack_range(shard)
     total_shards = int(of_shards)
     if total_shards != len(shards):
@@ -89,42 +89,49 @@ def import_project(project: str, shard: str, of_shards: str) -> None:
 
     # TODO this could use cachecontrol session
     ps = PyPISimple(accept=ACCEPT_JSON_ONLY)
-    cn = canonicalize_name(project)
-    pp = ps.get_project_page(cn)
-    versions = sorted(
-        {dp.version for dp in pp.packages},
-        key=Version,
-        reverse=True,
-    )
-    for version in versions:
-        distribution_package = max(
-            [dp for dp in pp.packages if dp.version == version],
-            key=rank,
+    for project in projects:
+        cn = canonicalize_name(project)
+        pp = ps.get_project_page(cn)
+        versions = sorted(
+            {dp.version for dp in pp.packages},
+            key=Version,
+            reverse=True,
         )
+        for version in versions:
+            distribution_package = max(
+                [dp for dp in pp.packages if dp.version == version],
+                key=rank,
+            )
 
-        # .filename
-        # .digests["sha256"]
-        # .url
-        # .size (only if json-fetched)
-        # .upload_time (only if json-fetched)
-        # .package_type == "wheel" for now
-        if distribution_package.package_type not in ("sdist", "wheel"):
-            continue
+            # .filename
+            # .digests["sha256"]
+            # .url
+            # .size (only if json-fetched)
+            # .upload_time (only if json-fetched)
+            # .package_type == "wheel" for now
+            if distribution_package.package_type not in ("sdist", "wheel"):
+                continue
 
-        if (
-            int.from_bytes(hashlib.sha256(distribution_package.url.encode()).digest())
-            % total_shards
-        ) not in shards:
-            print("omit", distribution_package.url)
-            continue
+            if (
+                int.from_bytes(
+                    hashlib.sha256(distribution_package.url.encode()).digest()
+                )
+                % total_shards
+            ) not in shards:
+                print("omit", distribution_package.url)
+                continue
 
-        import_url(
-            hash=distribution_package.digests["sha256"],
-            url=distribution_package.url,
-            date=distribution_package.upload_time,
-            project=cn,
-            version=distribution_package.version,
-        )
+            try:
+                import_url(
+                    hash=distribution_package.digests["sha256"],
+                    url=distribution_package.url,
+                    date=distribution_package.upload_time,
+                    project=cn,
+                    version=distribution_package.version,
+                )
+            except Exception as e:
+                print("done with", project, repr(e))
+                break
 
 
 @main.command()
