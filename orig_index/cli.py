@@ -204,7 +204,9 @@ def local_file(local_file: str) -> None:
                         distance,
                     )  # , norm_snippet.snippet.text)
                     moreorless.click.echo_color_unified_diff(
-                        snippet.snippet.text, norm_snippet.snippet.text, ""
+                        snippet.snippet.text + "\n",
+                        norm_snippet.snippet.text + "\n",
+                        "",
                     )
                 print("----")
 
