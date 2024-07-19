@@ -181,15 +181,16 @@ def import_one_local_file(fp: Path, rel: Path, session) -> File:
                 x.embedding = model.encode(x.text)
 
             hashes = [v["hash"] for v in values]
-            result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
-            result_all = [r[0] for r in result.all()]
+            # result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
+            # result_all = {r[0].hash: r[0] for r in result.all()}
 
             new_snippet_in_normalized = [
                 SnippetInNormalizedFile(
                     normalized_file_hash=nh,
-                    snippet_hash=r.hash,
+                    snippet_hash=h,
+                    sequence=i,
                 )
-                for r in result_all
+                for i, h in enumerate(hashes)
             ]
             for s in new_snippet_in_normalized:
                 session.add(s)

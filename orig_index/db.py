@@ -81,7 +81,11 @@ class NormalizedFile(Base):
     __tablename__ = "normalized_file"
 
     hash = Column(String(64), primary_key=True)
-    snippets = relationship("SnippetInNormalizedFile", back_populates="normalized_file")
+    snippets = relationship(
+        "SnippetInNormalizedFile",
+        back_populates="normalized_file",
+        order_by="SnippetInNormalizedFile.sequence",
+    )
 
     denorm_files = relationship("File", back_populates="normalized")
 
@@ -99,10 +103,10 @@ class SnippetInNormalizedFile(Base):
     snippet_hash = Column(
         String(64), ForeignKey("snippet.hash"), nullable=False, index=True
     )
-    # TODO sequence (or just start line)
 
     normalized_file = relationship("NormalizedFile")
     snippet = relationship("Snippet", back_populates="normalized_files")
+    sequence = Column(Integer)
 
 
 class Snippet(Base):
