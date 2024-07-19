@@ -6,6 +6,7 @@ from sqlalchemy import (
     create_engine,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -116,8 +117,18 @@ class Snippet(Base):
 
     text = Column(Text)
     # This should probably be denormalized further, with the model or other params as another field.
-    embedding = Column(Vector(384))
+    embedding = Column(Vector(768))
     normalized_files = relationship("SnippetInNormalizedFile", back_populates="snippet")
+
+    __tableargs__ = (
+        Index(
+            "ix_snippet",
+            embedding,
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_l2_ops"},
+        ),
+    )
 
 
 # TODO embedding index

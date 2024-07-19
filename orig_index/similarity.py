@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import desc, select
 
 from .db import (
     Archive,
@@ -26,4 +26,21 @@ def find_archives_containing_normalized_file(hash: str, session: Session):
         .join(File.archives)
         .where(File.normalized_hash == hash)
         .order_by(FileInArchive.vendor_level)
+    )
+
+
+def find_archives_containing_similar_snippet(snippet: Snippet, session: Session):
+    return session.execute(
+        select(
+            FileInArchive,
+            (Snippet.embedding.l2_distance(snippet.embedding).label("distance")),
+            SnippetInNormalizedFile,
+        )
+        .join(File.normalized)
+        .join(File.archives)
+        .join(NormalizedFile.snippets)
+        .join(SnippetInNormalizedFile.snippet)
+        .order_by("distance")
+        # .order_by(desc('distance'))
+        .limit(2)
     )

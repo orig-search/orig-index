@@ -1,10 +1,11 @@
 import datetime
 import hashlib
 from pathlib import Path
-from packaging.utils import canonicalize_name
 from typing import Set
 
 import click
+import moreorless.click
+from packaging.utils import canonicalize_name
 from packaging.version import Version
 from pypi_simple import ACCEPT_JSON_ONLY, DistributionPackage, PyPISimple
 from sqlalchemy import text
@@ -15,6 +16,7 @@ from .importer import have_hash, import_archive, import_one_local_file, import_u
 from .similarity import (
     find_archives_containing_file,
     find_archives_containing_normalized_file,
+    find_archives_containing_similar_snippet,
 )
 
 
@@ -178,6 +180,26 @@ def local_file(local_file: str) -> None:
             ).all():
                 print(m.sample_name, "in", m.archive.filename, m.vendor_level)
             # find_
+            for snippet in imported.normalized.snippets:
+                print(repr(snippet.snippet.text))
+                for (
+                    m,
+                    distance,
+                    norm_snippet,
+                ) in find_archives_containing_similar_snippet(
+                    snippet.snippet, session
+                ).all():
+                    print(
+                        m.sample_name,
+                        "in",
+                        m.archive.filename,
+                        m.vendor_level,
+                        distance,
+                    )  # , norm_snippet.snippet.text)
+                    moreorless.click.echo_color_unified_diff(
+                        snippet.snippet.text, norm_snippet.snippet.text, ""
+                    )
+                print("----")
 
 
 @lookup.command()

@@ -31,7 +31,12 @@ def get_model():
     if MODEL is None:
         from sentence_transformers import SentenceTransformer
 
-        MODEL = SentenceTransformer(os.getenv("MODEL_NAME", "all-MiniLM-L6-v2"))
+        MODEL = SentenceTransformer(
+            os.getenv(
+                "MODEL_NAME",
+                "flax-sentence-embeddings/st-codesearch-distilroberta-base",
+            )
+        )
     return MODEL
 
 
