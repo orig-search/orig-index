@@ -9,6 +9,7 @@ from packaging.utils import canonicalize_name
 from packaging.version import Version
 from pypi_simple import ACCEPT_JSON_ONLY, DistributionPackage, PyPISimple
 from sqlalchemy import text
+import uvicorn
 
 from .db import Base, engine, NormalizedFile, Session, Snippet
 
@@ -24,6 +25,19 @@ from .similarity import (
 def main():
     pass
 
+@main.command()
+@click.option("--reload", is_flag=True, default=False)
+@click.option("--port", default=8000)
+def web(port :int, reload: bool):
+    """
+    Launch webapp
+    """
+    uvicorn.run(
+        "orig_index.web:APP",
+        host="0.0.0.0",
+        port=port,
+        reload=reload,
+    )  # nosec
 
 @main.command()
 @click.option("--clear", is_flag=True)
