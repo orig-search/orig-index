@@ -17,8 +17,7 @@ setup:
 
 .PHONY: test
 test:
-	python -m coverage run -m orig_index.tests $(TESTOPTS)
-	python -m coverage report
+	pytest $(TESTOPTS)
 
 .PHONY: format
 format:
