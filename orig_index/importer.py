@@ -1,4 +1,5 @@
 import ast
+import datetime
 import hashlib
 import os
 import shutil
@@ -53,7 +54,9 @@ def have_hash(sha256: str) -> bool:
         return bool(t)
 
 
-def import_url(hash, url, date, project, version) -> None:
+def import_url(
+    hash: str | None, url: str, date: datetime.datetime, project: str, version: str
+) -> None:
     if hash is not None and have_hash(hash):
         return
 

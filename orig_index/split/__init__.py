@@ -1,3 +1,31 @@
+"""
+Splits (normalized) source code into segments.
+
+A segment is basically an outer function (or the stuff between such functions).
+It is just a (generally multiline) string, and might not be valid source code
+when considered individually.  For avoidance of doubt, you would generally pass
+in the normalized module resulting from `orig_index.norm` operating on it, and
+line numbers are thrown away explicitly but statements are kept in the same
+order.
+
+An example:
+
+```
+class X:
+    def func():
+        pass
+    var1 = 1
+var2 = 2
+```
+
+is three segments, the `class X: pass`, the `def func(): pass`, and then the two
+`var` lines (retaining their relative indention).  If there were imports, they
+would be part of the `class X` segment.
+
+If the segments are concatenated in their original order, it should be valid
+python again.
+"""
+
 import ast
 import re
 import textwrap

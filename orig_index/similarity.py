@@ -1,4 +1,4 @@
-from sqlalchemy import desc, select
+from sqlalchemy import select
 
 from .db import (
     Archive,
@@ -41,6 +41,5 @@ def find_archives_containing_similar_snippet(snippet: Snippet, session: Session)
         .join(NormalizedFile.snippets)
         .join(SnippetInNormalizedFile.snippet)
         .order_by("distance")
-        # .order_by(desc('distance'))
         .limit(2)
     )

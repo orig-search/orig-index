@@ -4,15 +4,15 @@ from pathlib import Path
 
 import click
 import moreorless.click
+import uvicorn
 from packaging.utils import canonicalize_name
 from packaging.version import Version
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import text
-import uvicorn
 
 from .db import Base, engine, NormalizedFile, Session, Snippet
 
-from .importer import have_hash, import_archive, import_one_local_file, import_url
+from .importer import import_archive, import_one_local_file, import_url
 from .similarity import (
     find_archives_containing_file,
     find_archives_containing_normalized_file,
@@ -25,10 +25,11 @@ from .util import _unpack_range, rank
 def main():
     pass
 
+
 @main.command()
 @click.option("--reload", is_flag=True, default=False)
 @click.option("--port", default=8000)
-def web(port :int, reload: bool):
+def web(port: int, reload: bool):
     """
     Launch webapp
     """
@@ -38,6 +39,7 @@ def web(port :int, reload: bool):
         port=port,
         reload=reload,
     )  # nosec
+
 
 @main.command()
 @click.option("--clear", is_flag=True)
@@ -66,8 +68,8 @@ def import_project(projects: list[str], shard: str, of_shards: str) -> None:
         cn = canonicalize_name(project)
         pp = ps.get_project_page(cn)
         versions = sorted(
-            {dp.version for dp in pp.packages},
-            key=Version,
+            {dp.version for dp in pp.packages if dp.version is not None},
+            key=Version,  # type: ignore[arg-type]
             reverse=True,
         )
         for version in versions:
@@ -95,12 +97,14 @@ def import_project(projects: list[str], shard: str, of_shards: str) -> None:
                 continue
 
             try:
+                upload_time = distribution_package.upload_time
+                assert upload_time is not None
                 import_url(
                     hash=distribution_package.digests["sha256"],
                     url=distribution_package.url,
-                    date=distribution_package.upload_time,
+                    date=upload_time,
                     project=cn,
-                    version=distribution_package.version,
+                    version=version,
                 )
             except Exception as e:
                 print("done with", project, repr(e))
@@ -108,17 +112,28 @@ def import_project(projects: list[str], shard: str, of_shards: str) -> None:
 
 
 @main.command()
+@click.option("--project", required=True)
+@click.option("--version", required=True)
 @click.argument("url")
-def import_a_url(url):
+def import_a_url(url: str, project: str, version: str):
+    # Does not validate project name on purpose -- this is mostly useful for
+    # non-pypi projects or explicit malware that will be referred to either with
+    # a PURL style name, or an illegal one starting with "-"
     import_url(
-        hash=None, url=url, date=datetime.datetime(3000, 1, 1, tzinfo=datetime.UTC)
+        hash=None,
+        url=url,
+        date=datetime.datetime(3000, 1, 1, tzinfo=datetime.UTC),
+        project=project,
+        version=version,
     )
 
 
 @main.command()
+@click.option("--project", required=True)
+@click.option("--version", required=True)
 # TODO multiple, require it exists
 @click.argument("local_file")
-def import_local_archive(local_file: str) -> None:
+def import_local_archive(local_file: str, project: str, version: str) -> None:
     with open(local_file, "rb") as f:
         h = hashlib.sha256()
         while chunk := f.read(8192):
@@ -131,6 +146,8 @@ def import_local_archive(local_file: str) -> None:
             3000, 1, 1, tzinfo=datetime.UTC
         ),  # TODO could also use mtime?
         local_file=local_file,
+        project=project,
+        version=version,
     )
 
 
@@ -205,7 +222,9 @@ def normalized_hash(hash: str) -> None:
             print("Not yet available")
             return
         for s in normalized_file.snippets:
-            print(s.snippet.hash)
+            print(f"# {s.snippet.hash}")
+            print(s.snippet.text)
+            print()
 
 
 @lookup.command()
@@ -213,6 +232,7 @@ def normalized_hash(hash: str) -> None:
 def snippet_hash(hash: str) -> None:
     with Session() as session:
         snippet = session.get(Snippet, hash)
+        assert snippet is not None
         for f in snippet.normalized_files:
             print(f.normalized_file_hash, f.denorm_files)
 
