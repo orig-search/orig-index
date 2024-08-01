@@ -1,13 +1,12 @@
 import datetime
 import hashlib
 from pathlib import Path
-from typing import Set
 
 import click
 import moreorless.click
 from packaging.utils import canonicalize_name
 from packaging.version import Version
-from pypi_simple import ACCEPT_JSON_ONLY, DistributionPackage, PyPISimple
+from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import text
 import uvicorn
 
@@ -19,6 +18,7 @@ from .similarity import (
     find_archives_containing_normalized_file,
     find_archives_containing_similar_snippet,
 )
+from .util import _unpack_range, rank
 
 
 @click.group()
@@ -48,33 +48,6 @@ def createdb(clear: bool) -> None:
         session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         session.commit()
     Base.metadata.create_all(engine)
-
-
-def rank(dp: DistributionPackage) -> int:
-    if dp.package_type == "sdist":
-        return 10
-    elif "-py3-none-any" in dp.filename:
-        return 5
-    elif "-py2.py3-none-any" in dp.filename:
-        return 4
-    elif "abi3" in dp.filename:
-        return 2
-    elif "cp312" in dp.filename:
-        return 1
-    elif dp.package_type != "wheel":
-        return -1
-    return 0
-
-
-def _unpack_range(s: str) -> Set[int]:
-    rv: Set[int] = set()
-    for x in s.split(","):
-        if "-" in x:
-            a, b = map(int, x.split("-", 1))
-            rv.update(range(a, b + 1))
-        else:
-            rv.add(int(x))
-    return rv
 
 
 @main.command()
