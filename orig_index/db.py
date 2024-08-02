@@ -1,7 +1,14 @@
-import local_conf
-
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import create_engine, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    create_engine,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import declarative_base, mapped_column, relationship, sessionmaker
 
 Base = declarative_base()
@@ -128,11 +135,33 @@ class Snippet(Base):
     )
 
 
-# TODO embedding index
+def _createdb(clear: bool) -> None:
+    if clear:
+        Base.metadata.drop_all(engine)
+    with Session() as session:
+        session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        session.commit()
+    Base.metadata.create_all(engine)
 
-engine = create_engine(
-    local_conf.CONNECTION_STRING,
-    # echo=True,
-    future=True,
-)
-Session = sessionmaker(engine)
+
+engine = None
+Session = None
+
+
+def recreate_engine():
+    global engine
+    global Session
+    try:
+        import local_conf
+    except ImportError:
+        print("You probably need to adjust PYTHONPATH to have local_conf.py dir")
+        return
+    engine = create_engine(
+        local_conf.CONNECTION_STRING,
+        # echo=True,
+        future=True,
+    )
+    Session = sessionmaker(engine)
+
+
+recreate_engine()

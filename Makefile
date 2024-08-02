@@ -1,6 +1,6 @@
 UV?=uv
 PYTHON?=python
-SOURCES=orig_index setup.py
+SOURCES=orig_index tests setup.py
 
 .PHONY: venv
 venv:
@@ -17,7 +17,7 @@ setup:
 
 .PHONY: test
 test:
-	pytest $(TESTOPTS)
+	pytest --cov=orig_index $(TESTOPTS)
 
 .PHONY: format
 format:

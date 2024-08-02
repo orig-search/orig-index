@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import IO
 
 import requests
 from sqlalchemy import select
@@ -143,8 +144,21 @@ def import_local_dir(
                     session.add(orm_file_in_archive)
 
 
-def import_one_local_file(fp: Path, rel: Path, session) -> File:
-    data = fp.read_bytes()
+def import_one_local_file(
+    fp: Path, rel: Path, session, file: IO[bytes] | None = None
+) -> File:
+    """
+    Provide either fp (Path) or file (a file-like object positioned at the
+    start) to import some bytes.
+
+    rel is only used for printing stuff.
+    """
+
+    if file:
+        data = file.read()
+    else:
+        data = fp.read_bytes()
+
     h = hashlib.sha256(data).hexdigest()
     orm_file = session.get(File, h)
     if orm_file is not None:
@@ -172,6 +186,8 @@ def import_one_local_file(fp: Path, rel: Path, session) -> File:
                 }
                 for a, b, text in segments
             ]
+            # TODO seems "number of parameters must be between 0 and 65535" so
+            # we need to batch this.  Found on cdktf-cdktf-provider-aws 19.29.0
             stmt = (
                 insert(Snippet)
                 .values(values)
@@ -180,13 +196,17 @@ def import_one_local_file(fp: Path, rel: Path, session) -> File:
             )
             ret = session.execute(stmt)
             model = get_model()
-            for (x,) in ret:
-                x.embedding = model.encode(x.text)
+            texts = [x[0].text for x in ret]
+            if texts:
+                embeddings = model.encode(texts)
+                for (x,), e in zip(ret, embeddings):
+                    x.embedding = e
 
             hashes = [v["hash"] for v in values]
             # result = session.execute(select(Snippet).where(Snippet.hash.in_(hashes)))
             # result_all = {r[0].hash: r[0] for r in result.all()}
 
+            # TODO probably batch this too
             new_snippet_in_normalized = [
                 SnippetInNormalizedFile(
                     normalized_file_hash=nh,

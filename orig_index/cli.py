@@ -10,7 +10,7 @@ from packaging.version import Version
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import text
 
-from .db import Base, engine, NormalizedFile, Session, Snippet
+from .db import _createdb, Base, engine, NormalizedFile, Session, Snippet
 
 from .importer import import_archive, import_one_local_file, import_url
 from .similarity import (
@@ -44,12 +44,7 @@ def web(port: int, reload: bool):
 @main.command()
 @click.option("--clear", is_flag=True)
 def createdb(clear: bool) -> None:
-    if clear:
-        Base.metadata.drop_all(engine)
-    with Session() as session:
-        session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        session.commit()
-    Base.metadata.create_all(engine)
+    _createdb(clear)
 
 
 @main.command()
