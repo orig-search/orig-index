@@ -10,7 +10,15 @@ from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import select
 
-from .db import Base, File, NormalizedFile, Session, Snippet, SnippetInNormalizedFile
+from .db import (
+    Archive,
+    Base,
+    File,
+    NormalizedFile,
+    Session,
+    Snippet,
+    SnippetInNormalizedFile,
+)
 from .importer import have_hash, import_archive, import_one_local_file, import_url
 from .similarity import (
     find_archives_containing_file,
@@ -43,7 +51,7 @@ async def root() -> str:
 
 
 @APP.post("/import/project-url/")
-def import_project_url(project: str, url: str):
+def import_project_url(project: str, url: str, request: Request):
     """
     Indexes one known url from the given project.
 
@@ -70,9 +78,23 @@ def import_project_url(project: str, url: str):
                 project=cn,
                 version=distribution_package.version,
             )
-            break
+            return RedirectResponse(
+                request.url_for(
+                    "archive_hash", hash=distribution_package.digests["sha256"]
+                ),
+                status_code=303,
+            )
     else:
         raise HTTPException(404)
+
+
+@APP.get("/archive/hash/{hash}")
+def archive_hash(hash: str):
+    with Session() as session:
+        result = session.get(Archive, hash)
+        return {
+            "normalized": {f.file.normalized_hash: f.sample_name for f in result.files},
+        }
 
 
 @APP.get("/file/hash/{hash}")
@@ -83,7 +105,8 @@ def file_hash(hash: str, request: Request):
             raise HTTPException(404)
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=f.normalized_hash)
+            request.url_for("normalized_hash", hash=f.normalized_hash),
+            status_code=303,
         )
 
 
@@ -127,10 +150,7 @@ def sinppet_hash(hash: str):
         return {
             "text": s.text,
             "norm_count": len(s.normalized_files),
-            "norm_files": [
-                x.normalized_file_hash for x in s.normalized_files
-            ],
-
+            "norm_files": [x.normalized_file_hash for x in s.normalized_files],
         }
 
 
@@ -149,7 +169,8 @@ async def identify_file(file: UploadFile, request: Request):
         session.commit()
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=imported.normalized_hash)
+            request.url_for("normalized_hash", hash=imported.normalized_hash),
+            status_code=303,
         )
 
 
