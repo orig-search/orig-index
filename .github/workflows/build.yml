@@ -31,7 +31,9 @@ jobs:
           python -m pip install --upgrade pip uv
           make venv
       - name: Test
-        run: .venv/bin/python -m orig_index.tests
+        run: |
+          source .venv/bin/activate
+          make test
 
   orig_index:
     runs-on: ${{ matrix.os }}
@@ -53,6 +55,10 @@ jobs:
           python -m pip install --upgrade pip uv
           make venv
       - name: Test
-        run: make test
+        run: |
+          source .venv/bin/activate
+          make test
       - name: Lint
-        run: make lint
+        run: |
+          source .venv/bin/activate
+          make lint
