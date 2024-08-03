@@ -1,5 +1,5 @@
 name: Build
-on: 
+on:
   push:
     branches:
       - master
@@ -29,7 +29,8 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -U .[test]
+          pip install uv
+          uv pip install -U .[test]
       - name: Test
         run: python -m orig_index.tests
 
@@ -51,8 +52,9 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
+          pip install uv
           make setup
-          pip install -U .
+          uv pip install -U .
       - name: Test
         run: make test
       - name: Lint
