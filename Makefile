@@ -1,6 +1,7 @@
 UV?=uv
 PYTHON?=python
 SOURCES=orig_index tests setup.py
+TESTOPTS?=tests/
 
 .PHONY: venv
 venv:

@@ -27,6 +27,13 @@ class Archive(Base):
     version = mapped_column(String(256))
 
     @property
+    def purl(self):
+        if self.canonical_name and self.version:
+            return f"pkg:pypi/{self.canonical_name}@{self.version}"
+        else:
+            return self.url
+
+    @property
     def filename(self):
         return self.url.split("/")[-1]
 

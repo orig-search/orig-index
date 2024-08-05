@@ -83,7 +83,7 @@ TEST_SNIPPETS = (
     str(list(range(1000))),
 )
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import ast
     import sys
     import time
