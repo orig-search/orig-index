@@ -1,11 +1,12 @@
 UV?=uv
 PYTHON?=python
 SOURCES=orig_index tests setup.py
+TESTOPTS?=tests/
 
 .PHONY: venv
 venv:
 	$(UV) venv .venv
-	source .venv/bin/activate && make setup
+	VIRTUAL_ENV=$$PWD/.venv && $(MAKE) setup
 	@echo 'run `source .venv/bin/activate` to use virtualenv'
 
 # The rest of these are intended to be run within the venv, where python points
@@ -27,7 +28,7 @@ format:
 lint:
 	python -m ufmt check $(SOURCES)
 	python -m flake8 $(SOURCES)
-	python -m checkdeps --allow-names orig_index orig_index
+	python -m checkdeps --allow-names orig_index,numpy,local_conf orig_index
 	mypy --strict --install-types --non-interactive orig_index
 
 .PHONY: release

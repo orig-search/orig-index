@@ -1,22 +1,18 @@
 import logging
-import os
 from pathlib import Path
 
-import moreorless
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
-from sqlalchemy import select
 
-from .db import Base, File, NormalizedFile, Session, Snippet, SnippetInNormalizedFile
-from .importer import have_hash, import_archive, import_one_local_file, import_url
-from .similarity import (
-    find_archives_containing_file,
-    find_archives_containing_normalized_file,
-    find_archives_containing_similar_snippet,
-)
+from .api.archive import api_explore_files_in_archive
+from .api.normalized import api_normalized_detail, api_normalized_partial
+from .api.snippets import api_snippet_detail
+
+from .db import File, Session, Snippet
+from .importer import import_one_local_file, import_url
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
@@ -42,8 +38,45 @@ async def root() -> str:
     return "Visit /docs"
 
 
+@APP.get("/api/archive/hash/{hash}")
+def archive_hash(hash: str):
+    """
+    Intended to power an inspector-like gui based on archive hash
+    """
+    return api_explore_files_in_archive(hash)
+
+
+@APP.get("/api/normalized/hash/{hash}")
+def normalized_detail(hash: str):
+    """
+    Serves the text of the snippets, and mentions what the "oldest" archive
+    containing this normalized file is.
+
+    Calculating hash-matches of snippets or embedding-similarity of matches is a
+    lot more expensive, and should lazy-load from other endpoints.
+    """
+    return api_normalized_detail(hash)
+
+
+@APP.get("/api/normalized/partial/{hash}")
+def normalized_partial(hash: str):
+    """
+    Search for hashes of snippets of this normalized file, assuming that the
+    snippets are unmodified.
+    """
+    return api_normalized_partial(hash)
+
+
+@APP.get("/api/snippet-detail/hash/{hash}")
+def snippet_detail(hash: str):
+    """
+    Intended to power a drill-down page at some point.
+    """
+    return api_snippet_detail(hash)
+
+
 @APP.post("/import/project-url/")
-def import_project_url(project: str, url: str):
+def import_project_url(project: str, url: str, request: Request):
     """
     Indexes one known url from the given project.
 
@@ -70,7 +103,12 @@ def import_project_url(project: str, url: str):
                 project=cn,
                 version=distribution_package.version,
             )
-            break
+            return RedirectResponse(
+                request.url_for(
+                    "archive_hash", hash=distribution_package.digests["sha256"]
+                ),
+                status_code=303,
+            )
     else:
         raise HTTPException(404)
 
@@ -83,39 +121,9 @@ def file_hash(hash: str, request: Request):
             raise HTTPException(404)
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=f.normalized_hash)
+            request.url_for("normalized_hash", hash=f.normalized_hash),
+            status_code=303,
         )
-
-
-@APP.get("/normalized/hash/{hash}")
-def normalized_hash(hash: str):
-    """
-    Finds archives that definitively contain an equivalent file.
-
-    TODO: could use an html renderer as well, this is all pretty quick and is
-    enough to display the source code while we wait for much slower near-matches
-    calls.
-    """
-    with Session() as session:
-        f = session.get(NormalizedFile, hash)
-        if not f:
-            raise HTTPException(404)
-        return {
-            "archives": [
-                {"hash": x.archive.hash, "filename": x.archive.filename}
-                for (x,) in find_archives_containing_normalized_file(hash, session)
-            ],
-            "snippets": [
-                {"hash": x.hash, "text": x.text}
-                for (x,) in session.execute(
-                    select(Snippet)
-                    .join(NormalizedFile.snippets)
-                    .join(SnippetInNormalizedFile.snippet)
-                    .where(NormalizedFile.hash == hash)
-                    .order_by(SnippetInNormalizedFile.sequence)
-                ).all()
-            ],
-        }
 
 
 @APP.get("/snippet/hash/{hash}")
@@ -127,17 +135,13 @@ def sinppet_hash(hash: str):
         return {
             "text": s.text,
             "norm_count": len(s.normalized_files),
-            "norm_files": [
-                x.normalized_file_hash for x in s.normalized_files
-            ],
-
+            "norm_files": [x.normalized_file_hash for x in s.normalized_files],
         }
 
 
 @APP.post("/identify/file/")
 async def identify_file(file: UploadFile, request: Request):
     local_file = Path(file.filename)
-    results = {}
 
     with Session() as session:
         imported = import_one_local_file(
@@ -149,65 +153,6 @@ async def identify_file(file: UploadFile, request: Request):
         session.commit()
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=imported.normalized_hash)
+            request.url_for("normalized_hash", hash=imported.normalized_hash),
+            status_code=303,
         )
-
-
-"""
-        results["hash"] = imported.hash
-        results["normalized_hash"] = imported.normalized.hash
-        results["exact_matches"] = []
-        results["normalized_matches"] = []
-        results["near_matches"] = []
-
-        exact_matches = results["exact_matches"]
-        for (m,) in find_archives_containing_file(imported.hash, session).all():
-            exact_matches.append(
-                {
-                    "sample_name": m.sample_name,
-                    "archive": m.archive.filename,
-                    "vendor_level": m.vendor_level,
-                }
-            )
-
-        if not exact_matches:
-            normalized_matches = results["normalized_matches"]
-            print("No exact matches, checking normalized matches...")
-            for (m,) in find_archives_containing_normalized_file(
-                imported.normalized.hash, session
-            ).all():
-                normalized_matches.append(
-                    {
-                        "sample_name": m.sample_name,
-                        "archive": m.archive.filename,
-                        "vendor_level": m.vendor_level,
-                    }
-                )
-
-        if not normalized_matches:
-            near_matches = results["near_matches"]
-            print("No normalized matches, checking near matches...")
-            for snippet in imported.normalized.snippets:
-                for (
-                    m,
-                    distance,
-                    norm_snippet,
-                ) in find_archives_containing_similar_snippet(
-                    snippet.snippet, session
-                ).all():
-                    near_matches.append(
-                        {
-                            "sample_name": m.sample_name,
-                            "archive": m.archive.filename,
-                            "vendor_level": m.vendor_level,
-                            "distance": distance,
-                            "diff": moreorless.unified_diff(
-                                snippet.snippet.text,
-                                norm_snippet.snippet.text,
-                                "example.py",
-                            ),
-                        }
-                    )
-    os.remove(local_file)
-    return results
-"""
