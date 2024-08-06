@@ -1,9 +1,20 @@
+"""
+Normalize source code to remove common sources of churn like whitespace changes.
+
+This doesn't call ast.unparse, thus does not validate that the resulting source
+code is anything close to valid.  Tests, as well as orig_index.split use, do.
+
+Past bugs here have basically been removing the only statement where at least
+one statement was required (e.g. docstring -> pass).
+"""
+
 import ast
 from typing import Optional
 
 
 class RemoveDocstringsAndTypes(ast.NodeTransformer):
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.Assign:
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.Assign | ast.AnnAssign:
         if not node.value:
             return node
         return ast.copy_location(
@@ -22,16 +33,20 @@ class RemoveDocstringsAndTypes(ast.NodeTransformer):
             return None
         return node
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
+    def visit_something_with_body(self, node: ast.AST) -> ast.AST:
+        # This is not used directly (the name is not magic), but is assigned to
+        # other visit_ methods below.
         modified = self.generic_visit(node)
+        assert hasattr(modified, "body")
         if not modified.body:
             modified.body.append(ast.Pass())
         return modified
 
-    visit_ClassDef = visit_FunctionDef
-    visit_If = visit_FunctionDef
-    visit_ExceptHandler = visit_FunctionDef
-    visit_Try = visit_FunctionDef
+    visit_FunctionDef = visit_something_with_body
+    visit_ClassDef = visit_something_with_body
+    visit_If = visit_something_with_body
+    visit_ExceptHandler = visit_something_with_body
+    visit_Try = visit_something_with_body
     # N.b. Try has finalbody, but it can safely be empty
 
 

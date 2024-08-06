@@ -1,5 +1,5 @@
 name: Build
-on: 
+on:
   push:
     branches:
       - master
@@ -28,10 +28,12 @@ jobs:
           allow-prereleases: true
       - name: Install
         run: |
-          python -m pip install --upgrade pip
-          pip install -U .[test]
+          python -m pip install --upgrade pip uv
+          make venv
       - name: Test
-        run: python -m orig_index.tests
+        run: |
+          source .venv/bin/activate
+          make test
 
   orig_index:
     runs-on: ${{ matrix.os }}
@@ -50,10 +52,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install
         run: |
-          python -m pip install --upgrade pip
-          make setup
-          pip install -U .
+          python -m pip install --upgrade pip uv
+          make venv
       - name: Test
-        run: make test
+        run: |
+          source .venv/bin/activate
+          make test
       - name: Lint
-        run: make lint
+        run: |
+          source .venv/bin/activate
+          make lint
