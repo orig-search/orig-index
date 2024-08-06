@@ -1,17 +1,9 @@
 from collections import defaultdict
 
 from fastapi.exceptions import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from ..db import (
-    Archive,
-    File,
-    FileInArchive,
-    NormalizedFile,
-    Session,
-    Snippet,
-    SnippetInNormalizedFile,
-)
+from ..db import NormalizedFile, Session, Snippet, SnippetInNormalizedFile
 
 
 def api_normalized_detail(hash):
@@ -46,7 +38,7 @@ def api_normalized_detail(hash):
 
 def api_normalized_partial(hash):
     with Session() as sess:
-        norm = sess.get(NormalizedFile, hash)
+        # norm = sess.get(NormalizedFile, hash)
         snippet_hashes = [
             x
             for (x,) in sess.execute(

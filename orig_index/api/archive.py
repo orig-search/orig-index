@@ -1,15 +1,6 @@
 from fastapi.exceptions import HTTPException
-from sqlalchemy import func, select
 
-from ..db import (
-    Archive,
-    File,
-    FileInArchive,
-    NormalizedFile,
-    Session,
-    Snippet,
-    SnippetInNormalizedFile,
-)
+from ..db import Archive, Session
 
 
 def api_explore_files_in_archive(hash):

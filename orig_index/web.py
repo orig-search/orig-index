@@ -6,15 +6,13 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
-from sqlalchemy import select
 
 from .api.archive import api_explore_files_in_archive
 from .api.normalized import api_normalized_detail, api_normalized_partial
 from .api.snippets import api_snippet_detail
 
-from .db import File, NormalizedFile, Session, Snippet, SnippetInNormalizedFile
+from .db import File, Session, Snippet
 from .importer import import_one_local_file, import_url
-from .similarity import find_archives_containing_normalized_file
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
