@@ -8,7 +8,9 @@ from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import select
 
-from .api.snippets import api_explore_files_in_archive, api_snippet_detail
+from .api.archive import api_explore_files_in_archive
+from .api.normalized import api_normalized_detail, api_normalized_partial
+from .api.snippets import api_snippet_detail
 
 from .db import File, NormalizedFile, Session, Snippet, SnippetInNormalizedFile
 from .importer import import_one_local_file, import_url
@@ -44,6 +46,27 @@ def archive_hash(hash: str):
     Intended to power an inspector-like gui based on archive hash
     """
     return api_explore_files_in_archive(hash)
+
+
+@APP.get("/api/normalized/hash/{hash}")
+def normalized_detail(hash: str):
+    """
+    Serves the text of the snippets, and mentions what the "oldest" archive
+    containing this normalized file is.
+
+    Calculating hash-matches of snippets or embedding-similarity of matches is a
+    lot more expensive, and should lazy-load from other endpoints.
+    """
+    return api_normalized_detail(hash)
+
+
+@APP.get("/api/normalized/partial/{hash}")
+def normalized_partial(hash: str):
+    """
+    Search for hashes of snippets of this normalized file, assuming that the
+    snippets are unmodified.
+    """
+    return api_normalized_partial(hash)
 
 
 @APP.get("/api/snippet-detail/hash/{hash}")
@@ -103,37 +126,6 @@ def file_hash(hash: str, request: Request):
             request.url_for("normalized_hash", hash=f.normalized_hash),
             status_code=303,
         )
-
-
-@APP.get("/normalized/hash/{hash}")
-def normalized_hash(hash: str):
-    """
-    Finds archives that definitively contain an equivalent file.
-
-    TODO: could use an html renderer as well, this is all pretty quick and is
-    enough to display the source code while we wait for much slower near-matches
-    calls.
-    """
-    with Session() as session:
-        f = session.get(NormalizedFile, hash)
-        if not f:
-            raise HTTPException(404)
-        return {
-            "archives": [
-                {"hash": x.archive.hash, "filename": x.archive.filename}
-                for (x,) in find_archives_containing_normalized_file(hash, session)
-            ],
-            "snippets": [
-                {"hash": x.hash, "text": x.text}
-                for (x,) in session.execute(
-                    select(Snippet)
-                    .join(NormalizedFile.snippets)
-                    .join(SnippetInNormalizedFile.snippet)
-                    .where(NormalizedFile.hash == hash)
-                    .order_by(SnippetInNormalizedFile.sequence)
-                ).all()
-            ],
-        }
 
 
 @APP.get("/snippet/hash/{hash}")
