@@ -1,9 +1,12 @@
+import html
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from jinja2_fragments.fastapi import Jinja2Blocks
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 
@@ -20,6 +23,8 @@ logging.basicConfig(
 logging.getLogger("urllib3.connectionpool").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
+templates = Jinja2Blocks(directory="templates")
+
 
 class App(FastAPI):
     """Docstring for public class."""
@@ -32,10 +37,12 @@ class App(FastAPI):
 
 APP = App()
 
+APP.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @APP.get("/")
-async def root() -> str:
-    return "Visit /docs"
+async def index(request: Request) -> str:
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @APP.get("/api/archive/hash/{hash}")
@@ -46,8 +53,8 @@ def archive_hash(hash: str):
     return api_explore_files_in_archive(hash)
 
 
-@APP.get("/api/normalized/hash/{hash}")
-def normalized_detail(hash: str):
+@APP.get("/api/normalized/hash/{hash}", response_class=HTMLResponse)
+def normalized_detail(hash: str, request: Request):
     """
     Serves the text of the snippets, and mentions what the "oldest" archive
     containing this normalized file is.
@@ -55,16 +62,44 @@ def normalized_detail(hash: str):
     Calculating hash-matches of snippets or embedding-similarity of matches is a
     lot more expensive, and should lazy-load from other endpoints.
     """
-    return api_normalized_detail(hash)
+    results = api_normalized_detail(hash)
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "results": results}, block_name="results"
+    )
 
 
-@APP.get("/api/normalized/partial/{hash}")
-def normalized_partial(hash: str):
+@APP.get("/api/normalized/partial/{hash}", response_class=HTMLResponse)
+def normalized_partial(hash: str, request: Request):
     """
     Search for hashes of snippets of this normalized file, assuming that the
     snippets are unmodified.
     """
-    return api_normalized_partial(hash)
+    results = api_normalized_detail(hash)
+    partial = api_normalized_partial(hash)
+    snippet_table = "<table border='1'>\n"
+    snippet_table += "<tr><th>Source</th>"
+
+    for col in partial["found"]:
+        snippet_table += f"<th><a href='{request.url_for('normalized_partial', hash=col['hash'])}' title='{col['hash']}'>{col['hash'][:4]}...</a></th>"
+
+    snippet_table += "</tr>\n"
+    for i, snip in enumerate(results["snippets"]):
+        snippet_table += "<tr>"
+        snippet_table += (
+            "<td><pre style='white-space: pre-wrap'>"
+            + html.escape(snip["text"])
+            + "</pre></td>"
+        )
+        for col in partial["found"]:
+            snippet_table += "<td>" + ("X" if i in col["incl"] else "") + "</td>"
+        snippet_table += "</tr>\n"
+    snippet_table += "</table>"
+
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "results": results, "snippet_table": snippet_table},
+        block_name="results",
+    )
 
 
 @APP.get("/api/snippet-detail/hash/{hash}")
@@ -121,7 +156,7 @@ def file_hash(hash: str, request: Request):
             raise HTTPException(404)
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=f.normalized_hash),
+            request.url_for("normalized_detail", hash=f.normalized_hash),
             status_code=303,
         )
 
@@ -153,6 +188,6 @@ async def identify_file(file: UploadFile, request: Request):
         session.commit()
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=imported.normalized_hash),
+            request.url_for("normalized_detail", hash=imported.normalized_hash),
             status_code=303,
         )

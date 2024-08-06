@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}File Upload {% endblock %}
+
+{% block content %}
+<h1>File Upload</h1>
+<div class="row">
+  <form hx-post="{{ url_for('identify_file') }}" hx-encoding='multipart/form-data' id='upload' hx-target="#results">
+    <input type='file' name='file'>
+    <button>
+      Upload
+    </button>
+    <progress id='progress' value='0' max='100'></progress>
+  </form>
+</div>
+<hr />
+
+{% block results %}
+
+<div id='results'>
+  {% if results %}
+  <h2>File Information</h2>
+  <h3>Hash: {{results['hash']}}</h3>
+  <h3>Oldest Archive: {{results['oldest_archive']}}</h3>
+  <h3>Snippets</h3>
+  {% if snippet_table %}
+  {{ snippet_table | safe }}
+  {% else %}
+  <ul>
+    {% for snippet in results['snippets'] %}
+    <li>Hash: {{ snippet.hash }}</li>
+    <pre>{{ snippet.text }}</pre>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  htmx.on('#upload', 'htmx:xhr:progress', function (evt) {
+    htmx.find('#progress').setAttribute('value', evt.detail.loaded / evt.detail.total * 100)
+  });
+</script>
+{% endblock %}
