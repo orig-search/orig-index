@@ -40,6 +40,8 @@ class RemoveDocstringsAndTypes(ast.NodeTransformer):
         assert hasattr(modified, "body")
         if not modified.body:
             modified.body.append(ast.Pass())
+        # if hasattr(modified, "returns"):
+        #     modified.returns = None
         return modified
 
     visit_FunctionDef = visit_something_with_body

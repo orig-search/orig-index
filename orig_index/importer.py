@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import IO
 
 import requests
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from .db import (
