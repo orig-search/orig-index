@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}File Upload {% endblock %}
+{% block head %} {{super()}} <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.7.1/min/dropzone.min.css"> {%endblock%}
+
+{% block content %}
+  <h1>File Upload</h1>
+  <div class="row">
+    <form action="{{ url_for('upload') }}" class="dropzone" id="my-dropzone">
+    </form>
+  </div>
+  <hr />
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.7.1/min/dropzone.min.js"></script>
+<script>
+Dropzone.autoDiscover = false;
+var myDropzone = new Dropzone("#my-dropzone");
+</script>
+{% endblock %}
