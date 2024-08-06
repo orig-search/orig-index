@@ -38,8 +38,8 @@ APP = App()
 APP.mount("/static", StaticFiles(directory="static"), name="static")
 
 @APP.get("/")
-async def root() -> str:
-    return "Visit /docs"
+async def index(request: Request) -> str:
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @APP.get("/api/archive/hash/{hash}")
