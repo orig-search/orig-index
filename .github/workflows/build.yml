@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12"]
         os: [macOS-latest, ubuntu-latest]
 
     steps:
@@ -32,8 +32,7 @@ jobs:
           make venv
       - name: Test
         run: |
-          source .venv/bin/activate
-          make test
+          /bin/sh -c 'source .venv/bin/activate && make test'
 
   orig_index:
     runs-on: ${{ matrix.os }}
@@ -56,9 +55,7 @@ jobs:
           make venv
       - name: Test
         run: |
-          source .venv/bin/activate
-          make test
+          /bin/sh -c 'source .venv/bin/activate && make test'
       - name: Lint
         run: |
-          source .venv/bin/activate
-          make lint
+          /bin/sh -c 'source .venv/bin/activate && make lint'

@@ -1,32 +1,18 @@
 import logging
-import os
 from pathlib import Path
 
-import moreorless
-from fastapi import Depends, FastAPI, Request, UploadFile
+from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
 from sqlalchemy import select
 
-from .db import (
-    Archive,
-    Base,
-    File,
-    NormalizedFile,
-    Session,
-    Snippet,
-    SnippetInNormalizedFile,
-)
-from .importer import have_hash, import_archive, import_one_local_file, import_url
-from .similarity import (
-    find_archives_containing_file,
-    find_archives_containing_normalized_file,
-    find_archives_containing_similar_snippet,
-)
-
 from .api.snippets import api_explore_files_in_archive, api_snippet_detail
+
+from .db import File, NormalizedFile, Session, Snippet, SnippetInNormalizedFile
+from .importer import import_one_local_file, import_url
+from .similarity import find_archives_containing_normalized_file
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
@@ -58,6 +44,7 @@ def archive_hash(hash: str):
     Intended to power an inspector-like gui based on archive hash
     """
     return api_explore_files_in_archive(hash)
+
 
 @APP.get("/api/snippet-detail/hash/{hash}")
 def snippet_detail(hash: str):
@@ -103,8 +90,6 @@ def import_project_url(project: str, url: str, request: Request):
             )
     else:
         raise HTTPException(404)
-
-
 
 
 @APP.get("/file/hash/{hash}")
@@ -167,7 +152,6 @@ def sinppet_hash(hash: str):
 @APP.post("/identify/file/")
 async def identify_file(file: UploadFile, request: Request):
     local_file = Path(file.filename)
-    results = {}
 
     with Session() as session:
         imported = import_one_local_file(
@@ -182,63 +166,3 @@ async def identify_file(file: UploadFile, request: Request):
             request.url_for("normalized_hash", hash=imported.normalized_hash),
             status_code=303,
         )
-
-
-"""
-        results["hash"] = imported.hash
-        results["normalized_hash"] = imported.normalized.hash
-        results["exact_matches"] = []
-        results["normalized_matches"] = []
-        results["near_matches"] = []
-
-        exact_matches = results["exact_matches"]
-        for (m,) in find_archives_containing_file(imported.hash, session).all():
-            exact_matches.append(
-                {
-                    "sample_name": m.sample_name,
-                    "archive": m.archive.filename,
-                    "vendor_level": m.vendor_level,
-                }
-            )
-
-        if not exact_matches:
-            normalized_matches = results["normalized_matches"]
-            print("No exact matches, checking normalized matches...")
-            for (m,) in find_archives_containing_normalized_file(
-                imported.normalized.hash, session
-            ).all():
-                normalized_matches.append(
-                    {
-                        "sample_name": m.sample_name,
-                        "archive": m.archive.filename,
-                        "vendor_level": m.vendor_level,
-                    }
-                )
-
-        if not normalized_matches:
-            near_matches = results["near_matches"]
-            print("No normalized matches, checking near matches...")
-            for snippet in imported.normalized.snippets:
-                for (
-                    m,
-                    distance,
-                    norm_snippet,
-                ) in find_archives_containing_similar_snippet(
-                    snippet.snippet, session
-                ).all():
-                    near_matches.append(
-                        {
-                            "sample_name": m.sample_name,
-                            "archive": m.archive.filename,
-                            "vendor_level": m.vendor_level,
-                            "distance": distance,
-                            "diff": moreorless.unified_diff(
-                                snippet.snippet.text,
-                                norm_snippet.snippet.text,
-                                "example.py",
-                            ),
-                        }
-                    )
-    os.remove(local_file)
-    return results
-"""

@@ -30,7 +30,7 @@ def test_funcdef_type():
 
 
 @pytest.mark.xfail
-def test_funcdef_type():
+def test_funcdef_ret_type():
     assert "def f(x):\n    pass" == ast.unparse(
         normalize(ast.parse("def f(x) -> None: pass"))
     )
