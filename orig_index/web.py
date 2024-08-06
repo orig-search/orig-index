@@ -1,13 +1,14 @@
+import html
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from jinja2_fragments.fastapi import Jinja2Blocks
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
-from jinja2_fragments.fastapi import Jinja2Blocks
 
 from .api.archive import api_explore_files_in_archive
 from .api.normalized import api_normalized_detail, api_normalized_partial
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 templates = Jinja2Blocks(directory="templates")
 
+
 class App(FastAPI):
     """Docstring for public class."""
 
@@ -36,6 +38,7 @@ class App(FastAPI):
 APP = App()
 
 APP.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @APP.get("/")
 async def index(request: Request) -> str:
@@ -60,16 +63,43 @@ def normalized_detail(hash: str, request: Request):
     lot more expensive, and should lazy-load from other endpoints.
     """
     results = api_normalized_detail(hash)
-    return templates.TemplateResponse("index.html", {"request": request, "results": results}, block_name="results")
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "results": results}, block_name="results"
+    )
 
 
-@APP.get("/api/normalized/partial/{hash}")
-def normalized_partial(hash: str):
+@APP.get("/api/normalized/partial/{hash}", response_class=HTMLResponse)
+def normalized_partial(hash: str, request: Request):
     """
     Search for hashes of snippets of this normalized file, assuming that the
     snippets are unmodified.
     """
-    return api_normalized_partial(hash)
+    results = api_normalized_detail(hash)
+    partial = api_normalized_partial(hash)
+    snippet_table = "<table border='1'>\n"
+    snippet_table += "<tr><th>Source</th>"
+
+    for col in partial["found"]:
+        snippet_table += f"<th title='{col['hash']}'>{col['hash'][:4]}...</th>"
+
+    snippet_table += "</tr>\n"
+    for i, snip in enumerate(results["snippets"]):
+        snippet_table += "<tr>"
+        snippet_table += (
+            "<td><pre style='white-space: pre-wrap'>"
+            + html.escape(snip["text"])
+            + "</pre></td>"
+        )
+        for col in partial["found"]:
+            snippet_table += "<td>" + ("X" if i in col["incl"] else "") + "</td>"
+        snippet_table += "</tr>\n"
+    snippet_table += "</table>"
+
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "results": results, "snippet_table": snippet_table},
+        block_name="results",
+    )
 
 
 @APP.get("/api/snippet-detail/hash/{hash}")

@@ -22,12 +22,16 @@
   <h3>Hash: {{results['hash']}}</h3>
   <h3>Oldest Archive: {{results['oldest_archive']}}</h3>
   <h3>Snippets</h3>
+  {% if snippet_table %}
+  {{ snippet_table | safe }}
+  {% else %}
   <ul>
     {% for snippet in results['snippets'] %}
     <li>Hash: {{ snippet.hash }}</li>
     <pre>{{ snippet.text }}</pre>
     {% endfor %}
   </ul>
+  {% endif %}
   {% endif %}
 </div>
 
