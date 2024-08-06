@@ -4,7 +4,7 @@
 {% block content %}
 <h1>File Upload</h1>
 <div class="row">
-  <form hx-post="{{ url_for('identify_file') }}" hx-encoding='multipart/form-data' id='upload'>
+  <form hx-post="{{ url_for('identify_file') }}" hx-encoding='multipart/form-data' id='upload' hx-target="#results">
     <input type='file' name='file'>
     <button>
       Upload
@@ -13,6 +13,25 @@
   </form>
 </div>
 <hr />
+
+{% block results %}
+
+<div id='results'>
+  {% if results %}
+  <h2>File Information</h2>
+  <h3>Hash: results['hash']</h3>
+  <h3>Oldest Archive: results['oldest_archive']</h3>
+  <ul>
+    {% for snippet in results['snippets'] %}
+    <li>{{ snippet.hash }}</li>
+    <pre>{{ snippet.text }}</pre>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+
+{% endblock %}
+
 {% endblock %}
 
 {% block scripts %}

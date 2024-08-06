@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
@@ -50,8 +50,8 @@ def archive_hash(hash: str):
     return api_explore_files_in_archive(hash)
 
 
-@APP.get("/api/normalized/hash/{hash}")
-def normalized_detail(hash: str):
+@APP.get("/api/normalized/hash/{hash}", response_class=HTMLResponse)
+def normalized_detail(hash: str, request: Request):
     """
     Serves the text of the snippets, and mentions what the "oldest" archive
     containing this normalized file is.
@@ -59,7 +59,8 @@ def normalized_detail(hash: str):
     Calculating hash-matches of snippets or embedding-similarity of matches is a
     lot more expensive, and should lazy-load from other endpoints.
     """
-    return api_normalized_detail(hash)
+    results = api_normalized_detail(hash)
+    return templates.TemplateResponse("index.html", {"request": request, "results": results}, block_name="results")
 
 
 @APP.get("/api/normalized/partial/{hash}")
