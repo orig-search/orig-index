@@ -71,15 +71,21 @@ def api_normalized_partial(hash):
         ):
             snippets_by_norm[norm_hash].add(snippet_hash)
 
-        ret = []
+        ret = {"found": [], "excluded": None}
 
         while snippet_hashes_set:
             # TODO break tie better
             (k, v) = max(
                 snippets_by_norm.items(), key=lambda i: len(i[1] & snippet_hashes_set)
             )
+            # The remaining `snippet_hashes_set` are only sourced from the
+            # excluded normalized files, stop the loop.
+            if not v & snippet_hashes_set:
+                break
+
             snippet_hashes_set.difference_update(v)
-            ret.append(
+            # Most matching snippets comes first
+            ret["found"].append(
                 {
                     "hash": k,
                     # TODO requires db change and migration or reindex
@@ -88,4 +94,10 @@ def api_normalized_partial(hash):
                     "incl": sorted([snippet_hashes.index(i) for i in v]),
                 }
             )
+
+        if snippet_hashes_set:
+            ret["excluded"] = sorted(
+                [snippet_hashes.index(i) for i in snippet_hashes_set]
+            )
+
         return ret
