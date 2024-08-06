@@ -4,8 +4,10 @@ from pathlib import Path
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from packaging.utils import canonicalize_name
 from pypi_simple import ACCEPT_JSON_ONLY, PyPISimple
+from jinja2_fragments.fastapi import Jinja2Blocks
 
 from .api.archive import api_explore_files_in_archive
 from .api.normalized import api_normalized_detail, api_normalized_partial
@@ -20,6 +22,7 @@ logging.basicConfig(
 logging.getLogger("urllib3.connectionpool").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
+templates = Jinja2Blocks(directory="templates")
 
 class App(FastAPI):
     """Docstring for public class."""
@@ -32,6 +35,7 @@ class App(FastAPI):
 
 APP = App()
 
+APP.mount("/static", StaticFiles(directory="static"), name="static")
 
 @APP.get("/")
 async def root() -> str:
