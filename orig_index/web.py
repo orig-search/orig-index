@@ -125,7 +125,7 @@ def file_hash(hash: str, request: Request):
             raise HTTPException(404)
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=f.normalized_hash),
+            request.url_for("normalized_detail", hash=f.normalized_hash),
             status_code=303,
         )
 
@@ -157,6 +157,6 @@ async def identify_file(file: UploadFile, request: Request):
         session.commit()
 
         return RedirectResponse(
-            request.url_for("normalized_hash", hash=imported.normalized_hash),
+            request.url_for("normalized_detail", hash=imported.normalized_hash),
             status_code=303,
         )
