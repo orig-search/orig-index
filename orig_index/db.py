@@ -20,7 +20,8 @@ class Archive(Base):
     hash = mapped_column(String(64), primary_key=True)
     url = mapped_column(String(256), nullable=False, index=True)
     timestamp = mapped_column(DateTime, nullable=False)
-    files = relationship("FileInArchive", back_populates="archive")
+    files = relationship("FileInArchive", back_populates="archive",
+    order_by="FileInArchive.sample_name")
 
     # Both of these should be pre-normalized
     canonical_name = mapped_column(String(256), index=True)

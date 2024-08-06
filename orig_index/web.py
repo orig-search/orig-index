@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 import moreorless
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, Request, UploadFile
 from fastapi.exceptions import HTTPException
 from fastapi.responses import RedirectResponse
 from packaging.utils import canonicalize_name
@@ -25,6 +25,8 @@ from .similarity import (
     find_archives_containing_normalized_file,
     find_archives_containing_similar_snippet,
 )
+
+from .api.snippets import api_explore_files_in_archive, api_snippet_detail
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
@@ -48,6 +50,21 @@ APP = App()
 @APP.get("/")
 async def root() -> str:
     return "Visit /docs"
+
+
+@APP.get("/api/archive/hash/{hash}")
+def archive_hash(hash: str):
+    """
+    Intended to power an inspector-like gui based on archive hash
+    """
+    return api_explore_files_in_archive(hash)
+
+@APP.get("/api/snippet-detail/hash/{hash}")
+def snippet_detail(hash: str):
+    """
+    Intended to power a drill-down page at some point.
+    """
+    return api_snippet_detail(hash)
 
 
 @APP.post("/import/project-url/")
@@ -88,13 +105,6 @@ def import_project_url(project: str, url: str, request: Request):
         raise HTTPException(404)
 
 
-@APP.get("/archive/hash/{hash}")
-def archive_hash(hash: str):
-    with Session() as session:
-        result = session.get(Archive, hash)
-        return {
-            "normalized": {f.file.normalized_hash: f.sample_name for f in result.files},
-        }
 
 
 @APP.get("/file/hash/{hash}")
