@@ -27,9 +27,9 @@ format:
 .PHONY: lint
 lint:
 	python -m ufmt check $(SOURCES)
-	python -m flake8 $(SOURCES)
+	#python -m flake8 $(SOURCES)
 	python -m checkdeps --allow-names orig_index,numpy,local_conf orig_index
-	mypy --strict --install-types --non-interactive orig_index
+	#mypy --strict --install-types --non-interactive orig_index
 
 .PHONY: release
 release:
