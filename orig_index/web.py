@@ -80,7 +80,7 @@ def normalized_partial(hash: str, request: Request):
     snippet_table += "<tr><th>Source</th>"
 
     for col in partial["found"]:
-        snippet_table += f"<th title='{col['hash']}'>{col['hash'][:4]}...</th>"
+        snippet_table += f"<th><a href='{request.url_for('normalized_partial', hash=col['hash'])}' title='{col['hash']}'>{col['hash'][:4]}...</a></th>"
 
     snippet_table += "</tr>\n"
     for i, snip in enumerate(results["snippets"]):
