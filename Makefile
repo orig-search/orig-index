@@ -6,7 +6,7 @@ TESTOPTS?=tests/
 .PHONY: venv
 venv:
 	$(UV) venv .venv
-	source .venv/bin/activate && make setup
+	VIRTUAL_ENV=$$PWD/.venv && $(MAKE) setup
 	@echo 'run `source .venv/bin/activate` to use virtualenv'
 
 # The rest of these are intended to be run within the venv, where python points

@@ -32,7 +32,7 @@ jobs:
           make venv
       - name: Test
         run: |
-          /bin/sh -c 'source .venv/bin/activate && make test'
+          /bin/bash -c 'source .venv/bin/activate && make test'
 
   orig_index:
     runs-on: ${{ matrix.os }}
@@ -55,7 +55,7 @@ jobs:
           make venv
       - name: Test
         run: |
-          /bin/sh -c 'source .venv/bin/activate && make test'
+          /bin/bash -c 'source .venv/bin/activate && make test'
       - name: Lint
         run: |
-          /bin/sh -c 'source .venv/bin/activate && make lint'
+          /bin/bash -c 'source .venv/bin/activate && make lint'
