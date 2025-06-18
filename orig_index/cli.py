@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import click
@@ -58,51 +59,64 @@ def import_project(projects: list[str], shard: str, of_shards: str) -> None:
 
     # TODO this could use cachecontrol session
     ps = PyPISimple(accept=ACCEPT_JSON_ONLY)
-    for project in projects:
-        cn = canonicalize_name(project)
-        pp = ps.get_project_page(cn)
-        versions = sorted(
-            {dp.version for dp in pp.packages if dp.version is not None},
-            key=Version,  # type: ignore[arg-type]
-            reverse=True,
-        )
-        for version in versions:
-            distribution_package = max(
-                [dp for dp in pp.packages if dp.version == version],
-                key=rank,
+    with ThreadPoolExecutor(max_workers=10) as tpe:
+        for project in projects:
+            cn = canonicalize_name(project)
+            try:
+                pp = ps.get_project_page(cn)
+            except Exception:
+                continue
+            tpe.submit(
+                import_project_work,
+                project=project,
+                cn=cn,
+                pp=pp,
+                shards=shards,
+                total_shards=total_shards,
             )
 
-            # .filename
-            # .digests["sha256"]
-            # .url
-            # .size (only if json-fetched)
-            # .upload_time (only if json-fetched)
-            # .package_type == "wheel" for now
-            if distribution_package.package_type not in ("sdist", "wheel"):
-                continue
 
-            if (
-                int.from_bytes(
-                    hashlib.sha256(distribution_package.url.encode()).digest()
-                )
-                % total_shards
-            ) not in shards:
-                print("omit", distribution_package.url)
-                continue
+def import_project_work(project, cn, pp, shards, total_shards):
+    versions = sorted(
+        {dp.version for dp in pp.packages if dp.version is not None},
+        key=Version,  # type: ignore[arg-type]
+        reverse=True,
+    )
+    for version in versions:
+        distribution_package = max(
+            [dp for dp in pp.packages if dp.version == version],
+            key=rank,
+        )
 
-            try:
-                upload_time = distribution_package.upload_time
-                assert upload_time is not None
-                import_url(
-                    hash=distribution_package.digests["sha256"],
-                    url=distribution_package.url,
-                    date=upload_time,
-                    project=cn,
-                    version=version,
-                )
-            except Exception as e:
-                print("done with", project, repr(e))
-                break
+        # .filename
+        # .digests["sha256"]
+        # .url
+        # .size (only if json-fetched)
+        # .upload_time (only if json-fetched)
+        # .package_type == "wheel" for now
+        if distribution_package.package_type not in ("sdist", "wheel"):
+            continue
+
+        if (
+            int.from_bytes(hashlib.sha256(distribution_package.url.encode()).digest())
+            % total_shards
+        ) not in shards:
+            print("omit", distribution_package.url)
+            continue
+
+        try:
+            upload_time = distribution_package.upload_time
+            assert upload_time is not None
+            import_url(
+                hash=distribution_package.digests["sha256"],
+                url=distribution_package.url,
+                date=upload_time,
+                project=cn,
+                version=version,
+            )
+        except Exception as e:
+            print("done with", project, repr(e))
+            break
 
 
 @main.command()

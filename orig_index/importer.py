@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from typing import IO
 
@@ -26,18 +27,21 @@ MODEL = None
 
 VENDOR_DIR_NAMES = {"vendor", "_vendor", "vendored", "_vendored"}
 
+lock = threading.Lock()
+
 
 def get_model():
     global MODEL
-    if MODEL is None:
-        from sentence_transformers import SentenceTransformer
+    with lock:
+        if MODEL is None:
+            from sentence_transformers import SentenceTransformer
 
-        MODEL = SentenceTransformer(
-            os.getenv(
-                "MODEL_NAME",
-                "flax-sentence-embeddings/st-codesearch-distilroberta-base",
+            MODEL = SentenceTransformer(
+                os.getenv(
+                    "MODEL_NAME",
+                    "flax-sentence-embeddings/st-codesearch-distilroberta-base",
+                )
             )
-        )
     return MODEL
 
 
