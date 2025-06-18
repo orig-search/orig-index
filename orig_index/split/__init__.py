@@ -68,6 +68,10 @@ class FunctionFinder(ShortCircuitingVisitor):
         first_node = node.decorator_list[0] if node.decorator_list else node
         self.covered_ranges[(first_node.lineno - 1, node.end_lineno)] = node
 
+    def visit_AsyncFunctionDef(self, node):
+        first_node = node.decorator_list[0] if node.decorator_list else node
+        self.covered_ranges[(first_node.lineno - 1, node.end_lineno)] = node
+
 
 def remove_whitespace_bookending(lines):
     while lines and WHITESPACE_RE.fullmatch(lines[0]):

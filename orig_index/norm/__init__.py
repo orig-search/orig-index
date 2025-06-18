@@ -13,7 +13,6 @@ from typing import Optional
 
 
 class RemoveDocstringsAndTypes(ast.NodeTransformer):
-
     def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.Assign | ast.AnnAssign:
         if not node.value:
             return node
@@ -45,6 +44,7 @@ class RemoveDocstringsAndTypes(ast.NodeTransformer):
         return modified
 
     visit_FunctionDef = visit_something_with_body
+    visit_AsyncFunctionDef = visit_something_with_body
     visit_ClassDef = visit_something_with_body
     visit_If = visit_something_with_body
     visit_ExceptHandler = visit_something_with_body
